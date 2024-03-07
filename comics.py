@@ -1,67 +1,104 @@
-import tkinter as tk
-import requests
+import sys
 import hashlib
 import time
+from PyQt6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QLabel, QPushButton, QTextBrowser
+import requests
 
-def generate_hash(ts, private_key, public_key):
-    hash_input = f'{ts}{private_key}{public_key}'
-    hashed = hashlib.md5(hash_input.encode('utf-8')).hexdigest()
-    return hashed
+class MarvelComicViewer(QMainWindow):
+    def __init__(self, api_key, private_key, parent=None):
+        super().__init__(parent)
+        self.api_key = api_key
+        self.private_key = private_key
+        self.current_page = 1
+        self.init_ui()
 
-def make_request(endpoint, params={}):
-    ts = str(int(time.time()))
-    hash_value = generate_hash(ts, private_key, public_key)
+    def init_ui(self):
+        self.setWindowTitle('Marvel Comic Viewer')
+        self.setGeometry(100, 100, 800, 600)
 
-    params['ts'] = ts
-    params['apikey'] = public_key
-    params['hash'] = hash_value
+        self.central_widget = QWidget(self)
+        self.setCentralWidget(self.central_widget)
 
-    response = requests.get(base_url + endpoint, params=params)
+        self.layout = QVBoxLayout(self.central_widget)
 
-    if response.status_code == 200:
-        return response.json()
-    else:
-        print(f'Error {response.status_code}: {response.text}')
-        return None
+        self.info_label = QLabel(self)
+        self.layout.addWidget(self.info_label)
 
-def get_character_info():
-    character_name = entry.get()
-    if not character_name:
-        result_label.config(text="Por favor, ingresa un nombre de personaje.")
-        return
+        self.comics_text_browser = QTextBrowser(self)
+        self.layout.addWidget(self.comics_text_browser)
 
-    params = {'name': character_name}
-    response = make_request('characters', params)
+        self.prev_button = QPushButton('Anterior', self)
+        self.prev_button.clicked.connect(self.load_prev_page)
+        self.layout.addWidget(self.prev_button)
 
-    if response:
-        results = response.get('data', {}).get('results', [])
-        if results:
-            character_data = results[0]
-            result_label.config(text=f"Nombre: {character_data['name']}\nDescripción: {character_data['description']}")
-        else:
-            result_label.config(text=f"No se encontró información para {character_name}")
+        self.next_button = QPushButton('Siguiente', self)
+        self.next_button.clicked.connect(self.load_next_page)
+        self.layout.addWidget(self.next_button)
 
-# Configuración de la API de Marvel
-public_key = 'llave_publica'
-private_key = 'llave_privada'
-base_url = 'https://gateway.marvel.com/v1/public/'
+        self.load_comics()
 
-# Crear la ventana principal
-root = tk.Tk()
-root.title("Marvel API Search")
+    def generate_hash(self):
+        ts = str(int(time.time()))
+        hash_input = ts + self.private_key + self.api_key
+        return ts, hashlib.md5(hash_input.encode('utf-8')).hexdigest()
 
-# Crear y añadir widgets
-label = tk.Label(root, text="Ingresa el nombre de un personaje de Marvel:")
-label.pack(pady=10)
+    def load_comics(self):
+        self.comics_text_browser.clear()
+        comics_url = 'https://gateway.marvel.com/v1/public/comics'
+        ts, hash_value = self.generate_hash()
 
-entry = tk.Entry(root)
-entry.pack(pady=10)
+        params = {
+            'apikey': self.api_key,
+            'ts': ts,
+            'hash': hash_value,
+            'limit': 5,
+            'offset': (self.current_page - 1) * 5
+        }
 
-search_button = tk.Button(root, text="Buscar", command=get_character_info)
-search_button.pack(pady=10)
+        try:
+            response = requests.get(comics_url, params=params)
+            data = response.json()
 
-result_label = tk.Label(root, text="")
-result_label.pack(pady=10)
+            if data['code'] == 200:
+                for comic in data['data']['results']:
+                    title = comic['title']
+                    isbn = comic['isbn'] if 'isbn' in comic else 'No disponible'
+                    description = comic['description'] if comic['description'] else 'Sin descripción disponible.'
+                    
+                    characters = [character['name'] for character in comic['characters']['items']]
+                    characters_str = ', '.join(characters) if characters else 'Ninguno'
 
-# Ejecutar el bucle principal
-root.mainloop()
+                    creators = [creator['name'] for creator in comic['creators']['items']]
+                    creators_str = ', '.join(creators) if creators else 'Ninguno'
+
+                    self.comics_text_browser.append(
+                        f'\nCómic: {title}\n'
+                        f'ISBN: {isbn}\n'
+                        f'Descripción: {description}\n'
+                        f'Personajes: {characters_str}\n'
+                        f'Creadores: {creators_str}\n'
+                        f'{"-" * 50}\n'
+                    )
+
+                self.info_label.setText(f'Página {self.current_page}')
+            else:
+                self.info_label.setText(f'Error al cargar cómics. Código de error: {data["code"]}')
+        except Exception as e:
+            self.info_label.setText(f'Error de conexión: {str(e)}')
+
+    def load_prev_page(self):
+        if self.current_page > 1:
+            self.current_page -= 1
+            self.load_comics()
+
+    def load_next_page(self):
+        self.current_page += 1
+        self.load_comics()
+
+if __name__ == '__main__':
+    api_key = 'clavepublica'  
+    private_key = 'claveprivada'  
+    app = QApplication(sys.argv)
+    viewer = MarvelComicViewer(api_key, private_key)
+    viewer.show()
+    sys.exit(app.exec())
