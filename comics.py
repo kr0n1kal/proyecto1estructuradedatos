@@ -13,7 +13,7 @@ class MarvelComicViewer(QMainWindow):
         self.init_ui()
 
     def init_ui(self):
-        self.setWindowTitle('Marvel Comic Viewer')
+        self.setWindowTitle('Mundo Comic - Comics')
         self.setGeometry(100, 100, 800, 600)
 
         self.central_widget = QWidget(self)
@@ -100,11 +100,21 @@ class CharacterDialog(QDialog):
         super().__init__(parent)
         self.api_key = api_key
         self.private_key = private_key
-        self.setWindowTitle('Marvel Characters')
+        self.setWindowTitle('Mundo Comic - Personajes')
         self.setLayout(QVBoxLayout())
 
         self.character_text_browser = QTextBrowser()
         self.layout().addWidget(self.character_text_browser)
+
+        self.current_page = 1
+
+        self.prev_button = QPushButton('Anterior', self)
+        self.prev_button.clicked.connect(self.load_prev_page)
+        self.layout().addWidget(self.prev_button)
+
+        self.next_button = QPushButton('Siguiente', self)
+        self.next_button.clicked.connect(self.load_next_page)
+        self.layout().addWidget(self.next_button)
 
         self.load_characters()
 
@@ -122,7 +132,8 @@ class CharacterDialog(QDialog):
             'apikey': self.api_key,
             'ts': ts,
             'hash': hash_value,
-            'limit': 5
+            'limit': 10,
+            'offset': (self.current_page - 1) * 10
         }
 
         try:
@@ -154,8 +165,18 @@ class CharacterDialog(QDialog):
                         f'Eventos: {events}\n'
                         f'{"-" * 50}\n'
                     )
+
         except requests.exceptions.RequestException as e:
             print(f'Error de conexión: {str(e)}')
+
+    def load_prev_page(self):
+        if self.current_page > 1:
+            self.current_page -= 1
+            self.load_characters()
+
+    def load_next_page(self):
+        self.current_page += 1
+        self.load_characters()
 
 if __name__ == '__main__':
     api_key = '83e2fb96ed102b9ce7ac383761eea7cb'
