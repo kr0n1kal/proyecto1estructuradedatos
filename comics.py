@@ -1,10 +1,3 @@
-import sys
-import hashlib
-import time
-from PyQt6.QtWidgets import QApplication, QMainWindow, QVBoxLayout, QWidget, QLabel, QPushButton, QTextBrowser, QDialog, QMessageBox
-from PyQt6.QtGui import QPixmap
-import requests
-
 class MarvelComicViewer(QMainWindow):
     def __init__(self, api_key, private_key, parent=None):
         super().__init__(parent)
@@ -69,10 +62,27 @@ class MarvelComicViewer(QMainWindow):
                 comics = data['data']['results']
                 for comic in comics:
                     title = comic['title']
-                    release_date = comic['dates'][0]['date']
+                    isbn = comic.get('isbn', 'N/A')
+                    description = comic.get('description', 'N/A')
+
+                    characters = 'N/A'
+                    if 'characters' in comic:
+                        characters_data = comic['characters']['items']
+                        if characters_data:
+                            characters = ', '.join(char['name'] for char in characters_data)
+
+                    creators = 'N/A'
+                    if 'creators' in comic:
+                        creators_data = comic['creators']['items']
+                        if creators_data:
+                            creators = ', '.join(creator['name'] for creator in creators_data)
+
                     self.comics_text_browser.append(
                         f'\nTítulo: {title}\n'
-                        f'Fecha de Lanzamiento: {release_date}\n'
+                        f'ISBN: {isbn}\n'
+                        f'Descripción: {description}\n'
+                        f'Personajes: {characters}\n'
+                        f'Creadores: {creators}\n'
                         f'{"-" * 50}\n'
                     )
             else:
@@ -92,6 +102,7 @@ class MarvelComicViewer(QMainWindow):
     def show_character_dialog(self):
         dialog = CharacterDialog(self.api_key, self.private_key)
         dialog.exec()
+
 
 class CharacterDialog(QDialog):
     def __init__(self, api_key, private_key, parent=None):
@@ -195,9 +206,10 @@ class CharacterDialog(QDialog):
         self.current_page += 1
         self.load_characters()
 
+
 if __name__ == '__main__':
-    api_key = 'clavepublica'
-    private_key = 'claveprivada'
+    api_key = '83e2fb96ed102b9ce7ac383761eea7cb'
+    private_key = '870e8cf06c7afbe315adf5eefa237554299944c1'
     app = QApplication(sys.argv)
     viewer = MarvelComicViewer(api_key, private_key)
     viewer.show()
